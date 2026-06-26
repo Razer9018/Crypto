@@ -367,6 +367,16 @@ def analyze_coin(symbol, name):
         risiko = kapital * (sl_pct / 100) * HEBEL
         profits[kapital] = {"risiko": risiko, "gewinn": risiko * crv}
 
+    # RSI Filter — kein BUY wenn RSI > 70, kein SELL wenn RSI < 30
+    h1_rsi = tf_results["H1"]["rsi"]
+    if h1_rsi:
+        if final_dir == "BUY" and h1_rsi > 70:
+            print(f"   {name}: RSI {h1_rsi:.1f} überkauft → BUY blockiert!")
+            return None
+        if final_dir == "SELL" and h1_rsi < 30:
+            print(f"   {name}: RSI {h1_rsi:.1f} überverkauft → SELL blockiert!")
+            return None
+
     return {
         "symbol": symbol, "name": name, "direction": final_dir,
         "score": total, "price": price,
