@@ -8,7 +8,7 @@ from datetime import datetime
 # ─── Config ───────────────────────────────────────────────────────────────────
 DISCORD_WEBHOOK = os.environ.get("DISCORD_WEBHOOK_CRYPTO", "")
 SCAN_EVERY      = 900   # alle 15 Minuten
-MIN_SCORE       = 8     # mindestens 8/10
+MIN_SCORE       = 7     # mindestens 7/10
 MAX_SIGNALS     = 2     # max 2 Signale pro Scan
 HEBEL           = 5
 
@@ -202,43 +202,52 @@ def safety_checks(name, final_dir, tf_results):
     Gibt (True, "") zurück wenn alles ok, sonst (False, Grund)
     """
 
-    # 1. RSI Filter auf M15 UND H1 (nicht überkauft/überverkauft)
-    for tf in ["M15", "H1"]:
-        r = tf_results.get(tf, {}).get("rsi")
-        if r:
-            if final_dir == "BUY" and r > 65:
-                return False, f"{tf} RSI {r:.1f} > 65 (überkauft)"
-            if final_dir == "SELL" and r < 35:
-                return False, f"{tf} RSI {r:.1f} < 35 (überverkauft)"
+    # 1. RSI Filter — M15 ist Haupttimeframe, strengster Filter
+    m15_rsi = tf_results.get("M15", {}).get("rsi")
+    if m15_rsi:
+        if final_dir == "BUY" and m15_rsi > 68:
+            return False, f"M15 RSI {m15_rsi:.1f} > 68 (überkauft auf M15)"
+        if final_dir == "SELL" and m15_rsi < 32:
+            return False, f"M15 RSI {m15_rsi:.1f} < 32 (überverkauft auf M15)"
 
-    # 2. RSI darf nicht zu extrem sein auf H4
+    # 2. RSI H1 — weniger streng
+    h1_rsi = tf_results.get("H1", {}).get("rsi")
+    if h1_rsi:
+        if final_dir == "BUY" and h1_rsi > 75:
+            return False, f"H1 RSI {h1_rsi:.1f} > 75 (überkauft auf H1)"
+        if final_dir == "SELL" and h1_rsi < 25:
+            return False, f"H1 RSI {h1_rsi:.1f} < 25 (überverkauft auf H1)"
+
+    # 3. RSI H4 — nur extremste Werte blockieren
     r_h4 = tf_results.get("H4", {}).get("rsi")
     if r_h4:
-        if final_dir == "BUY" and r_h4 > 70:
-            return False, f"H4 RSI {r_h4:.1f} > 70 (zu überkauft)"
-        if final_dir == "SELL" and r_h4 < 30:
-            return False, f"H4 RSI {r_h4:.1f} < 30 (zu überverkauft)"
+        if final_dir == "BUY" and r_h4 > 80:
+            return False, f"H4 RSI {r_h4:.1f} > 80 (extrem überkauft)"
+        if final_dir == "SELL" and r_h4 < 20:
+            return False, f"H4 RSI {r_h4:.1f} < 20 (extrem überverkauft)"
 
-    # 3. H4 EMA Trend darf nicht gegen Signal sein
+    # 3. H4 EMA Trend — nur gegen extremen Trend blockieren
     h4_trend = tf_results.get("H4", {}).get("ema_trend", "neutral")
     if final_dir == "BUY" and h4_trend == "bear":
-        return False, "H4 EMA Abwärtstrend — kein BUY gegen Trend"
+        return False, "H4 EMA starker Abwärtstrend — kein BUY"
     if final_dir == "SELL" and h4_trend == "bull":
-        return False, "H4 EMA Aufwärtstrend — kein SELL gegen Trend"
+        return False, "H4 EMA starker Aufwärtstrend — kein SELL"
 
-    # 4. MACD muss auf H1 UND H4 in gleiche Richtung zeigen
-    h1_macd = tf_results.get("H1", {}).get("macd")
-    h4_macd = tf_results.get("H4", {}).get("macd")
-    if h1_macd and h4_macd:
-        if final_dir == "BUY" and not (h1_macd > 0 and h4_macd > 0):
-            return False, "MACD H1+H4 nicht beide bullish"
-        if final_dir == "SELL" and not (h1_macd < 0 and h4_macd < 0):
-            return False, "MACD H1+H4 nicht beide bearish"
+    # 4. MACD muss auf M15 UND H1 stimmen
+    m15_macd = tf_results.get("M15", {}).get("macd")
+    h1_macd  = tf_results.get("H1",  {}).get("macd")
+    if m15_macd:
+        if final_dir == "BUY" and m15_macd < 0:
+            return False, "M15 MACD bearish — kein BUY"
+        if final_dir == "SELL" and m15_macd > 0:
+            return False, "M15 MACD bullish — kein SELL"
+    if h1_macd:
+        if final_dir == "BUY" and h1_macd < 0:
+            return False, "H1 MACD bearish — kein BUY"
+        if final_dir == "SELL" and h1_macd > 0:
+            return False, "H1 MACD bullish — kein SELL"
 
-    # 5. Volumen muss auf H1 erhöht sein
-    h1_vol = tf_results.get("H1", {}).get("vol_ok", False)
-    if not h1_vol:
-        return False, "Kein erhöhtes Volumen auf H1"
+    # 5. Volumen: gibt Bonus aber ist kein Pflicht-Filter mehr
 
     return True, "✅ Alle Filter bestanden"
 
@@ -362,10 +371,10 @@ def analyze_coin(symbol, name):
         print(f"   ❌ {name}: {reason}")
         return None
 
-    # Score (H4 zählt doppelt)
-    total = (tf_results["M15"]["bull" if final_dir == "BUY" else "bear"] +
+    # Score (M15 zählt doppelt — Haupttimeframe)
+    total = (tf_results["M15"]["bull" if final_dir == "BUY" else "bear"] * 2 +
              tf_results["H1"]["bull"  if final_dir == "BUY" else "bear"] +
-             tf_results["H4"]["bull"  if final_dir == "BUY" else "bear"] * 2)
+             tf_results["H4"]["bull"  if final_dir == "BUY" else "bear"])
 
     # SL/TP auf H1
     h1_candles = tf_results["H1"]["candles"]
@@ -414,11 +423,11 @@ def send_discord(r):
             arrow = "📈" if d["direction"] == "BUY" else "📉"
             rsi_v = f"{d['rsi']:.1f}" if d["rsi"] else "N/A"
             macd_a = "▲" if d["macd"] and d["macd"] > 0 else "▼"
-            weight = " ⭐(2x)" if tf == "H4" else ""
+            weight = " 🎯(Haupt)" if tf == "M15" else " (Bestätigung)" if tf == "H1" else " (Trend)"
             tf_text += f"{arrow} **{tf}{weight}**: RSI {rsi_v} | MACD {macd_a} | Vol {'✅' if d['vol_ok'] else '❌'}\n"
 
-    h4_details = r["tf_results"].get("H4", {}).get("details", {})
-    detail_text = "\n".join(list(h4_details.values())[:5])
+    m15_details = r["tf_results"].get("M15", {}).get("details", {})
+    detail_text = "\n".join(list(m15_details.values())[:5])
 
     tp_text = f"3:1 → ${r['tp3']:.4f}\n4:1 → ${r['tp4']:.4f}\n5:1 → ${r['tp5']:.4f}"
     p = r["profits"]
@@ -449,7 +458,7 @@ def send_discord(r):
             {"name": "💵 Gewinn/Verlust (5x Hebel)","value": profit_text,  "inline": False},
             {"name": "⚠️ Hinweis",                 "value": "Kein Finanzrat. Immer eigenes Risikomanagement verwenden!", "inline": False},
         ],
-        "footer": {"text": "Crypto Bot • Maximale Sicherheitsfilter • M15+H1+H4"},
+        "footer": {"text": "Crypto Bot • M15 Haupttimeframe • H1 Bestätigung • H4 Trend"},
         "timestamp": datetime.utcnow().isoformat() + "Z",
     }]}
     try:
