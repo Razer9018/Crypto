@@ -377,6 +377,18 @@ def analyze_coin(symbol, name):
             print(f"   {name}: RSI {h1_rsi:.1f} überverkauft → SELL blockiert!")
             return None
 
+    # EMA Trend Filter — niemals gegen den großen Trend traden
+    # BUY nur wenn H4 EMA nicht bearish (EMA20 < EMA50 < EMA200)
+    # SELL nur wenn H4 EMA nicht bullish (EMA20 > EMA50 > EMA200)
+    h4_details = tf_results["H4"]["details"]
+    h4_ema_text = h4_details.get("EMA Confluence", "")
+    if final_dir == "BUY" and "Abwärtstrend" in h4_ema_text:
+        print(f"   {name}: H4 EMA Abwärtstrend → BUY gegen Trend blockiert!")
+        return None
+    if final_dir == "SELL" and "Aufwärtstrend" in h4_ema_text:
+        print(f"   {name}: H4 EMA Aufwärtstrend → SELL gegen Trend blockiert!")
+        return None
+
     return {
         "symbol": symbol, "name": name, "direction": final_dir,
         "score": total, "price": price,
