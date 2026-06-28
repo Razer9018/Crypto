@@ -205,10 +205,10 @@ def safety_checks(name, final_dir, tf_results):
     # 1. RSI Filter — M15 ist Haupttimeframe, strengster Filter
     m15_rsi = tf_results.get("M15", {}).get("rsi")
     if m15_rsi:
-        if final_dir == "BUY" and m15_rsi > 68:
-            return False, f"M15 RSI {m15_rsi:.1f} > 68 (überkauft auf M15)"
-        if final_dir == "SELL" and m15_rsi < 32:
-            return False, f"M15 RSI {m15_rsi:.1f} < 32 (überverkauft auf M15)"
+        if final_dir == "BUY" and m15_rsi > 65:
+            return False, f"M15 RSI {m15_rsi:.1f} > 65 (überkauft auf M15)"
+        if final_dir == "SELL" and m15_rsi < 35:
+            return False, f"M15 RSI {m15_rsi:.1f} < 35 (überverkauft auf M15)"
 
     # 2. RSI H1 — weniger streng
     h1_rsi = tf_results.get("H1", {}).get("rsi")
@@ -233,9 +233,10 @@ def safety_checks(name, final_dir, tf_results):
     if final_dir == "SELL" and h4_trend == "bull":
         return False, "H4 EMA starker Aufwärtstrend — kein SELL"
 
-    # 4. MACD muss auf M15 UND H1 stimmen
+    # 4. MACD muss auf M15, H1 UND H4 stimmen
     m15_macd = tf_results.get("M15", {}).get("macd")
     h1_macd  = tf_results.get("H1",  {}).get("macd")
+    h4_macd  = tf_results.get("H4",  {}).get("macd")
     if m15_macd:
         if final_dir == "BUY" and m15_macd < 0:
             return False, "M15 MACD bearish — kein BUY"
@@ -246,6 +247,11 @@ def safety_checks(name, final_dir, tf_results):
             return False, "H1 MACD bearish — kein BUY"
         if final_dir == "SELL" and h1_macd > 0:
             return False, "H1 MACD bullish — kein SELL"
+    if h4_macd:
+        if final_dir == "BUY" and h4_macd < 0:
+            return False, "H4 MACD bearish — kein BUY gegen H4 Trend"
+        if final_dir == "SELL" and h4_macd > 0:
+            return False, "H4 MACD bullish — kein SELL gegen H4 Trend"
 
     # 5. Volumen: gibt Bonus aber ist kein Pflicht-Filter mehr
 
@@ -444,10 +450,10 @@ def send_discord(r):
         "description": (
             f"**Starkes {r['direction']} Signal — alle Filter bestanden!**\n"
             f"Score: **{r['score']} Punkte** | CRV: **{r['crv']}:1**\n\n"
-            f"✅ RSI im sicheren Bereich\n"
-            f"✅ MACD H1 + H4 bestätigt\n"
-            f"✅ Volumen Ausbruch vorhanden\n"
-            f"✅ Kein Signal gegen den Trend"
+            f"✅ RSI unter 65 auf M15 (sicherer Bereich)\n"
+            f"✅ MACD M15 + H1 + H4 alle bestätigt\n"
+            f"✅ H4 EMA Trend passt zur Richtung\n"
+            f"✅ Kein Signal gegen den großen Trend"
         ),
         "fields": [
             {"name": "📊 Multi-Timeframe",          "value": tf_text,      "inline": False},
