@@ -12,78 +12,83 @@ MIN_SCORE       = 7     # mindestens 7/10
 MAX_SIGNALS     = 2     # max 2 Signale pro Scan
 HEBEL           = 5
 
-TOP_50_CRYPTOS = [
-    ("BTC-USD",   "Bitcoin"),
-    ("ETH-USD",   "Ethereum"),
-    ("BNB-USD",   "BNB"),
-    ("SOL-USD",   "Solana"),
-    ("XRP-USD",   "XRP"),
-    ("ADA-USD",   "Cardano"),
-    ("AVAX-USD",  "Avalanche"),
-    ("DOGE-USD",  "Dogecoin"),
-    ("DOT-USD",   "Polkadot"),
-    ("MATIC-USD", "Polygon"),
-    ("LTC-USD",   "Litecoin"),
-    ("LINK-USD",  "Chainlink"),
-    ("ATOM-USD",  "Cosmos"),
-    ("XLM-USD",   "Stellar"),
-    ("BCH-USD",   "Bitcoin Cash"),
-    ("ALGO-USD",  "Algorand"),
-    ("FIL-USD",   "Filecoin"),
-    ("ICP-USD",   "Internet Computer"),
-    ("APT-USD",   "Aptos"),
-    ("NEAR-USD",  "NEAR Protocol"),
-    ("AAVE-USD",  "Aave"),
-    ("MKR-USD",   "Maker"),
-    ("INJ-USD",   "Injective"),
-    ("EGLD-USD",  "MultiversX"),
-    ("FLOW-USD",  "Flow"),
-    ("SAND-USD",  "The Sandbox"),
-    ("MANA-USD",  "Decentraland"),
-    ("AXS-USD",   "Axie Infinity"),
-    ("THETA-USD", "Theta"),
-    ("XTZ-USD",   "Tezos"),
-    ("EOS-USD",   "EOS"),
-    ("ENJ-USD",   "Enjin Coin"),
-    ("CHZ-USD",   "Chiliz"),
-    ("OP-USD",    "Optimism"),
-    ("GRT-USD",   "The Graph"),
-    ("COMP-USD",  "Compound"),
-    ("ZEC-USD",   "Zcash"),
-    ("BAT-USD",   "Basic Attention"),
-    ("ZIL-USD",   "Zilliqa"),
-    ("1INCH-USD", "1inch"),
-    ("VET-USD",   "VeChain"),
-    ("STX-USD",   "Stacks"),
-    ("SNX-USD",   "Synthetix"),
-    ("CRV-USD",   "Curve"),
-    ("LDO-USD",   "Lido"),
-    ("DASH-USD",  "Dash"),
-    ("ICX-USD",   "ICON"),
-    ("ONT-USD",   "Ontology"),
-    ("DGB-USD",   "DigiByte"),
-    ("SHIB-USD",  "Shiba Inu"),
+# Binance Symbole (USDT Paare)
+TOP_CRYPTOS = [
+    ("BTCUSDT",   "Bitcoin"),
+    ("ETHUSDT",   "Ethereum"),
+    ("BNBUSDT",   "BNB"),
+    ("SOLUSDT",   "Solana"),
+    ("XRPUSDT",   "XRP"),
+    ("ADAUSDT",   "Cardano"),
+    ("AVAXUSDT",  "Avalanche"),
+    ("DOGEUSDT",  "Dogecoin"),
+    ("DOTUSDT",   "Polkadot"),
+    ("MATICUSDT", "Polygon"),
+    ("LTCUSDT",   "Litecoin"),
+    ("LINKUSDT",  "Chainlink"),
+    ("ATOMUSDT",  "Cosmos"),
+    ("XLMUSDT",   "Stellar"),
+    ("BCHUSDT",   "Bitcoin Cash"),
+    ("ALGOUSDT",  "Algorand"),
+    ("FILUSDT",   "Filecoin"),
+    ("ICPUSDT",   "Internet Computer"),
+    ("APTUSDT",   "Aptos"),
+    ("NEARUSDT",  "NEAR Protocol"),
+    ("AAVEUSDT",  "Aave"),
+    ("MKRUSDT",   "Maker"),
+    ("INJUSDT",   "Injective"),
+    ("EGLDUSDT",  "MultiversX"),
+    ("FLOWUSDT",  "Flow"),
+    ("SANDUSDT",  "The Sandbox"),
+    ("MANAUSDT",  "Decentraland"),
+    ("AXSUSDT",   "Axie Infinity"),
+    ("THETAUSDT", "Theta"),
+    ("XTZUSDT",   "Tezos"),
+    ("EOSUSDT",   "EOS"),
+    ("ENJUSDT",   "Enjin Coin"),
+    ("CHZUSDT",   "Chiliz"),
+    ("OPUSDT",    "Optimism"),
+    ("GRTUSDT",   "The Graph"),
+    ("COMPUSDT",  "Compound"),
+    ("ZECUSDT",   "Zcash"),
+    ("BATUSDT",   "Basic Attention"),
+    ("ZILUSDT",   "Zilliqa"),
+    ("1INCHUSDT", "1inch"),
+    ("VETUSDT",   "VeChain"),
+    ("STXUSDT",   "Stacks"),
+    ("SNXUSDT",   "Synthetix"),
+    ("CRVUSDT",   "Curve"),
+    ("LDOUSDT",   "Lido"),
+    ("DASHUSDT",  "Dash"),
+    ("ICXUSDT",   "ICON"),
+    ("ONTUSDT",   "Ontology"),
+    ("DGBUSDT",   "DigiByte"),
+    ("SHIBUSDT",  "Shiba Inu"),
 ]
 
-# ─── Daten holen ──────────────────────────────────────────────────────────────
-def get_candles(symbol, interval, period="7d"):
+# Binance Interval Mapping
+INTERVALS = [("15m", "M15"), ("1h", "H1"), ("4h", "H4")]
+PERIODS   = {"15m": 200, "1h": 200, "4h": 200}  # Anzahl Kerzen
+
+# ─── Binance API (kostenlos, Echtzeit) ───────────────────────────────────────
+def get_candles_binance(symbol, interval, limit=200):
     try:
-        url = f"https://query1.finance.yahoo.com/v8/finance/chart/{symbol}?interval={interval}&range={period}"
+        url = f"https://api.binance.com/api/v3/klines?symbol={symbol}&interval={interval}&limit={limit}"
         req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
         with urllib.request.urlopen(req, timeout=15) as r:
             data = json.loads(r.read())
-        result = data["chart"]["result"][0]
-        times  = result["timestamp"]
-        q      = result["indicators"]["quote"][0]
         candles = []
-        for i in range(len(times)):
-            o, h, l, c = q["open"][i], q["high"][i], q["low"][i], q["close"][i]
-            vol = q.get("volume", [0]*len(times))[i] or 0
-            if o and h and l and c:
-                candles.append({"time": times[i], "open": o, "high": h,
-                                "low": l, "close": c, "volume": vol})
+        for k in data:
+            candles.append({
+                "time":   k[0],
+                "open":   float(k[1]),
+                "high":   float(k[2]),
+                "low":    float(k[3]),
+                "close":  float(k[4]),
+                "volume": float(k[5]),
+            })
         return candles
-    except:
+    except Exception as e:
         return None
 
 # ─── Indikatoren ──────────────────────────────────────────────────────────────
@@ -112,7 +117,7 @@ def rsi(closes, period=14):
         al = (al * (period-1) + max(-d, 0)) / period
     return 100 - 100 / (1 + ag / al) if al != 0 else 100
 
-def macd_full(closes):
+def macd_calc(closes):
     if len(closes) < 35:
         return None, None, None
     k26 = 2 / (26 + 1)
@@ -127,17 +132,12 @@ def macd_full(closes):
         macd_vals.append(e12 - e26)
     if len(macd_vals) < 9:
         return macd_vals[-1] if macd_vals else None, None, None
-    k9      = 2 / (9 + 1)
-    signal  = sum(macd_vals[:9]) / 9
+    k9     = 2 / (9 + 1)
+    signal = sum(macd_vals[:9]) / 9
     for v in macd_vals[9:]:
         signal = v * k9 + signal * (1 - k9)
     macd_line = macd_vals[-1]
     histogram = macd_line - signal
-    # Frischer Crossover: letzter Wert hat Signal gekreuzt
-    fresh = False
-    if len(macd_vals) >= 2:
-        prev_hist = macd_vals[-2] - signal
-        fresh = (prev_hist < 0 and histogram > 0) or (prev_hist > 0 and histogram < 0)
     return macd_line, signal, histogram
 
 def bollinger(closes, period=20, mult=2):
@@ -151,13 +151,13 @@ def bollinger(closes, period=20, mult=2):
 def rsi_divergence(candles, period=10):
     if len(candles) < period * 2:
         return None
-    closes = [c["close"] for c in candles]
+    closes   = [c["close"] for c in candles]
     rsi_vals = [rsi(closes[:i+1]) for i in range(len(closes))]
     rsi_vals = [r for r in rsi_vals if r is not None]
     if len(rsi_vals) < period * 2:
         return None
-    curr_low  = min(closes[-period:])
-    prev_low  = min(closes[-period*2:-period])
+    curr_low   = min(closes[-period:])
+    prev_low   = min(closes[-period*2:-period])
     curr_rsi_l = min(rsi_vals[-period:])
     prev_rsi_l = min(rsi_vals[-period*2:-period])
     if curr_low < prev_low and curr_rsi_l > prev_rsi_l:
@@ -180,7 +180,7 @@ def volume_breakout(candles, period=20, threshold=1.5):
     ratio = cur / avg
     return ratio >= threshold, ratio
 
-def ema_trend_h4(closes):
+def ema_trend(closes):
     e20  = ema(closes, 20)
     e50  = ema(closes, 50)
     e200 = ema(closes, 200) if len(closes) >= 200 else None
@@ -197,63 +197,38 @@ def ema_trend_h4(closes):
 
 # ─── Sicherheits-Filter ───────────────────────────────────────────────────────
 def safety_checks(name, final_dir, tf_results):
-    """
-    Alle Sicherheits-Filter die ein Signal blockieren können.
-    Gibt (True, "") zurück wenn alles ok, sonst (False, Grund)
-    """
+    # 1. RSI M15 und H1 — beide müssen unter 65 (BUY) bzw über 35 (SELL)
+    for tf in ["M15", "H1"]:
+        r = tf_results.get(tf, {}).get("rsi")
+        if r:
+            if final_dir == "BUY" and r > 65:
+                return False, f"{tf} RSI {r:.1f} > 65 — überkauft"
+            if final_dir == "SELL" and r < 35:
+                return False, f"{tf} RSI {r:.1f} < 35 — überverkauft"
 
-    # 1. RSI Filter — M15 ist Haupttimeframe, strengster Filter
-    m15_rsi = tf_results.get("M15", {}).get("rsi")
-    if m15_rsi:
-        if final_dir == "BUY" and m15_rsi > 65:
-            return False, f"M15 RSI {m15_rsi:.1f} > 65 (überkauft auf M15)"
-        if final_dir == "SELL" and m15_rsi < 35:
-            return False, f"M15 RSI {m15_rsi:.1f} < 35 (überverkauft auf M15)"
-
-    # 2. RSI H1 — gleich streng wie M15
-    h1_rsi = tf_results.get("H1", {}).get("rsi")
-    if h1_rsi:
-        if final_dir == "BUY" and h1_rsi > 65:
-            return False, f"H1 RSI {h1_rsi:.1f} > 65 (überkauft auf H1)"
-        if final_dir == "SELL" and h1_rsi < 35:
-            return False, f"H1 RSI {h1_rsi:.1f} < 35 (überverkauft auf H1)"
-
-    # 3. RSI H4 — nur extremste Werte blockieren
+    # 2. RSI H4 — nur extreme Werte blockieren
     r_h4 = tf_results.get("H4", {}).get("rsi")
     if r_h4:
         if final_dir == "BUY" and r_h4 > 80:
-            return False, f"H4 RSI {r_h4:.1f} > 80 (extrem überkauft)"
+            return False, f"H4 RSI {r_h4:.1f} > 80 — extrem überkauft"
         if final_dir == "SELL" and r_h4 < 20:
-            return False, f"H4 RSI {r_h4:.1f} < 20 (extrem überverkauft)"
+            return False, f"H4 RSI {r_h4:.1f} < 20 — extrem überverkauft"
 
-    # 3. H4 EMA Trend — muss klar in Signal-Richtung zeigen
+    # 3. H4 EMA muss klar in Signal-Richtung zeigen — KEIN neutraler Trend
     h4_trend = tf_results.get("H4", {}).get("ema_trend", "neutral")
     if final_dir == "BUY" and h4_trend != "bull":
-        return False, f"H4 EMA kein klarer Aufwärtstrend ({h4_trend}) — kein BUY"
+        return False, f"H4 EMA kein Aufwärtstrend ({h4_trend})"
     if final_dir == "SELL" and h4_trend != "bear":
-        return False, f"H4 EMA kein klarer Abwärtstrend ({h4_trend}) — kein SELL"
+        return False, f"H4 EMA kein Abwärtstrend ({h4_trend})"
 
     # 4. MACD muss auf M15, H1 UND H4 stimmen
-    m15_macd = tf_results.get("M15", {}).get("macd")
-    h1_macd  = tf_results.get("H1",  {}).get("macd")
-    h4_macd  = tf_results.get("H4",  {}).get("macd")
-    if m15_macd:
-        if final_dir == "BUY" and m15_macd < 0:
-            return False, "M15 MACD bearish — kein BUY"
-        if final_dir == "SELL" and m15_macd > 0:
-            return False, "M15 MACD bullish — kein SELL"
-    if h1_macd:
-        if final_dir == "BUY" and h1_macd < 0:
-            return False, "H1 MACD bearish — kein BUY"
-        if final_dir == "SELL" and h1_macd > 0:
-            return False, "H1 MACD bullish — kein SELL"
-    if h4_macd:
-        if final_dir == "BUY" and h4_macd < 0:
-            return False, "H4 MACD bearish — kein BUY gegen H4 Trend"
-        if final_dir == "SELL" and h4_macd > 0:
-            return False, "H4 MACD bullish — kein SELL gegen H4 Trend"
-
-    # 5. Volumen: gibt Bonus aber ist kein Pflicht-Filter mehr
+    for tf in ["M15", "H1", "H4"]:
+        m = tf_results.get(tf, {}).get("macd")
+        if m is not None:
+            if final_dir == "BUY" and m < 0:
+                return False, f"{tf} MACD bearish — kein BUY"
+            if final_dir == "SELL" and m > 0:
+                return False, f"{tf} MACD bullish — kein SELL"
 
     return True, "✅ Alle Filter bestanden"
 
@@ -261,56 +236,51 @@ def safety_checks(name, final_dir, tf_results):
 def analyze_tf(candles):
     if not candles or len(candles) < 50:
         return None
-    closes = [c["close"] for c in candles]
-    price  = closes[-1]
-
-    e20   = ema(closes, 20)
-    e50   = ema(closes, 50)
-    e200  = ema(closes, 200) if len(closes) >= 200 else None
-    rsi_v = rsi(closes)
-    macd_line, signal, histogram = macd_full(closes)
+    closes  = [c["close"] for c in candles]
+    price   = closes[-1]
+    e_trend = ema_trend(closes)
+    rsi_v   = rsi(closes)
+    macd_l, signal, hist = macd_calc(closes)
     bb_u, bb_m, bb_l = bollinger(closes)
     vol_ok, vol_ratio = volume_breakout(candles)
-    div   = rsi_divergence(candles)
-    trend = ema_trend_h4(closes)
+    div     = rsi_divergence(candles)
 
     bull = bear = 0
     details = {}
 
-    # EMA Confluence
-    if e20 and e50:
-        if trend == "bull":
-            bull += 2
-            details["EMA"] = f"✅ Aufwärtstrend (EMA20 > EMA50{' > EMA200' if e200 else ''})"
-        elif trend == "bear":
-            bear += 2
-            details["EMA"] = f"✅ Abwärtstrend (EMA20 < EMA50{' < EMA200' if e200 else ''})"
-        else:
-            details["EMA"] = "⚠️ Kein klarer EMA Trend"
+    # EMA Trend (2 Punkte)
+    if e_trend == "bull":
+        bull += 2
+        details["EMA"] = "✅ Aufwärtstrend (EMA20 > EMA50 > EMA200)"
+    elif e_trend == "bear":
+        bear += 2
+        details["EMA"] = "✅ Abwärtstrend (EMA20 < EMA50 < EMA200)"
+    else:
+        details["EMA"] = "⚠️ Kein klarer EMA Trend"
 
-    # MACD
-    if macd_line and signal:
-        if macd_line > signal and histogram and histogram > 0:
+    # MACD (2 Punkte)
+    if macd_l is not None and signal is not None:
+        if macd_l > signal and hist and hist > 0:
             bull += 2
-            details["MACD"] = f"✅ MACD bullish crossover ({macd_line:.5f})"
-        elif macd_line < signal and histogram and histogram < 0:
+            details["MACD"] = f"✅ MACD bullish ({macd_l:.6f})"
+        elif macd_l < signal and hist and hist < 0:
             bear += 2
-            details["MACD"] = f"✅ MACD bearish crossover ({macd_line:.5f})"
+            details["MACD"] = f"✅ MACD bearish ({macd_l:.6f})"
         else:
             details["MACD"] = "⚠️ MACD kein klarer Crossover"
 
-    # RSI
+    # RSI (1 Punkt)
     if rsi_v:
         if rsi_v < 40:
             bull += 1
-            details["RSI"] = f"✅ RSI überverkauft ({rsi_v:.1f}) → Kaufzone"
+            details["RSI"] = f"✅ RSI überverkauft ({rsi_v:.1f})"
         elif rsi_v > 60:
             bear += 1
-            details["RSI"] = f"✅ RSI überkauft ({rsi_v:.1f}) → Verkaufzone"
+            details["RSI"] = f"✅ RSI überkauft ({rsi_v:.1f})"
         else:
             details["RSI"] = f"⚠️ RSI neutral ({rsi_v:.1f})"
 
-    # RSI Divergenz
+    # RSI Divergenz (2 Punkte)
     if div == "bullish":
         bull += 2
         details["Divergenz"] = "✅ Bullische RSI Divergenz!"
@@ -320,50 +290,50 @@ def analyze_tf(candles):
     else:
         details["Divergenz"] = "❌ Keine Divergenz"
 
-    # Volumen
+    # Volumen (2 Punkte)
     if vol_ok:
         if bull >= bear: bull += 2
         else:            bear += 2
-        details["Volumen"] = f"✅ Volumen Ausbruch ({vol_ratio:.1f}x Durchschnitt)"
+        details["Volumen"] = f"✅ Volumen Ausbruch ({vol_ratio:.1f}x)"
     else:
         details["Volumen"] = f"❌ Normales Volumen ({vol_ratio:.1f}x)"
 
-    # Bollinger Bands
+    # Bollinger Bands (1 Punkt)
     if bb_l and price <= bb_l * 1.001:
         bull += 1
-        details["BB"] = f"✅ Preis am unteren Band"
+        details["BB"] = "✅ Preis am unteren Band"
     elif bb_u and price >= bb_u * 0.999:
         bear += 1
-        details["BB"] = f"✅ Preis am oberen Band"
+        details["BB"] = "✅ Preis am oberen Band"
     else:
         details["BB"] = "❌ Preis mittig"
 
     direction = "BUY" if bull > bear else "SELL" if bear > bull else "NEUTRAL"
     return {
         "direction": direction, "bull": bull, "bear": bear,
-        "rsi": rsi_v, "macd": macd_line, "details": details,
-        "price": price, "vol_ok": vol_ok, "ema_trend": trend,
+        "rsi": rsi_v, "macd": macd_l, "details": details,
+        "price": price, "vol_ok": vol_ok, "ema_trend": e_trend,
     }
 
 # ─── Coin analysieren ─────────────────────────────────────────────────────────
 def analyze_coin(symbol, name):
-    timeframes = [("15m", "M15", "7d"), ("1h", "H1", "30d"), ("4h", "H4", "90d")]
-    tf_results = {}
+    tf_data = {}
+    candle_store = {}
 
-    for interval, label, period in timeframes:
-        candles = get_candles(symbol, interval, period)
+    for interval, label in INTERVALS:
+        candles = get_candles_binance(symbol, interval, limit=200)
         if not candles or len(candles) < 50:
             continue
         r = analyze_tf(candles)
         if r:
             r["candles"] = candles
-            tf_results[label] = r
+            tf_data[label] = r
+            candle_store[label] = candles
 
-    if len(tf_results) < 3:
+    if len(tf_data) < 3:
         return None
 
-    # Alle 3 Timeframes müssen übereinstimmen
-    directions = [tf_results[tf]["direction"] for tf in ["M15", "H1", "H4"] if tf in tf_results]
+    directions = [tf_data[tf]["direction"] for tf in ["M15", "H1", "H4"] if tf in tf_data]
     if directions.count("BUY") == 3:
         final_dir = "BUY"
     elif directions.count("SELL") == 3:
@@ -371,19 +341,18 @@ def analyze_coin(symbol, name):
     else:
         return None
 
-    # Sicherheits-Filter
-    passed, reason = safety_checks(name, final_dir, tf_results)
+    passed, reason = safety_checks(name, final_dir, tf_data)
     if not passed:
-        print(f"   ❌ {name}: {reason}")
+        print(f"   ❌ {reason}")
         return None
 
-    # Score (M15 zählt doppelt — Haupttimeframe)
-    total = (tf_results["M15"]["bull" if final_dir == "BUY" else "bear"] * 2 +
-             tf_results["H1"]["bull"  if final_dir == "BUY" else "bear"] +
-             tf_results["H4"]["bull"  if final_dir == "BUY" else "bear"])
+    # Score — M15 zählt doppelt
+    total = (tf_data["M15"]["bull" if final_dir == "BUY" else "bear"] * 2 +
+             tf_data["H1"]["bull"  if final_dir == "BUY" else "bear"] +
+             tf_data["H4"]["bull"  if final_dir == "BUY" else "bear"])
 
-    # SL/TP auf H1
-    h1_candles = tf_results["H1"]["candles"]
+    # SL/TP auf H1 Basis
+    h1_candles = candle_store["H1"]
     price      = h1_candles[-1]["close"]
     recent     = h1_candles[-20:]
     puffer     = price * 0.005
@@ -412,7 +381,7 @@ def analyze_coin(symbol, name):
         "score": total, "price": price,
         "sl": sl, "tp3": tp3, "tp4": tp4, "tp5": tp5,
         "crv": crv, "sl_dist": sl_dist, "sl_pct": sl_pct,
-        "profits": profits, "tf_results": tf_results,
+        "profits": profits, "tf_data": tf_data,
     }
 
 # ─── Discord ──────────────────────────────────────────────────────────────────
@@ -424,15 +393,15 @@ def send_discord(r):
 
     tf_text = ""
     for tf in ["M15", "H1", "H4"]:
-        if tf in r["tf_results"]:
-            d = r["tf_results"][tf]
+        if tf in r["tf_data"]:
+            d = r["tf_data"][tf]
             arrow = "📈" if d["direction"] == "BUY" else "📉"
             rsi_v = f"{d['rsi']:.1f}" if d["rsi"] else "N/A"
             macd_a = "▲" if d["macd"] and d["macd"] > 0 else "▼"
-            weight = " 🎯(Haupt)" if tf == "M15" else " (Bestätigung)" if tf == "H1" else " (Trend)"
-            tf_text += f"{arrow} **{tf}{weight}**: RSI {rsi_v} | MACD {macd_a} | Vol {'✅' if d['vol_ok'] else '❌'}\n"
+            label = "🎯(Haupt)" if tf == "M15" else "(Bestätigung)" if tf == "H1" else "(Trend)"
+            tf_text += f"{arrow} **{tf} {label}**: RSI {rsi_v} | MACD {macd_a} | Vol {'✅' if d['vol_ok'] else '❌'}\n"
 
-    m15_details = r["tf_results"].get("M15", {}).get("details", {})
+    m15_details = r["tf_data"].get("M15", {}).get("details", {})
     detail_text = "\n".join(list(m15_details.values())[:5])
 
     tp_text = f"3:1 → ${r['tp3']:.4f}\n4:1 → ${r['tp4']:.4f}\n5:1 → ${r['tp5']:.4f}"
@@ -450,21 +419,21 @@ def send_discord(r):
         "description": (
             f"**Starkes {r['direction']} Signal — alle Filter bestanden!**\n"
             f"Score: **{r['score']} Punkte** | CRV: **{r['crv']}:1**\n\n"
-            f"✅ RSI unter 65 auf M15 (sicherer Bereich)\n"
+            f"✅ RSI unter 65 auf M15 + H1\n"
             f"✅ MACD M15 + H1 + H4 alle bestätigt\n"
-            f"✅ H4 EMA Trend passt zur Richtung\n"
-            f"✅ Kein Signal gegen den großen Trend"
+            f"✅ H4 EMA Trend klar in Signal-Richtung\n"
+            f"✅ Echtzeit Daten von Binance"
         ),
         "fields": [
-            {"name": "📊 Multi-Timeframe",          "value": tf_text,      "inline": False},
-            {"name": "🔍 H4 Indikator Details",     "value": detail_text,  "inline": False},
-            {"name": "💰 Einstieg",                 "value": f"${r['price']:.4f}", "inline": True},
-            {"name": "🛑 Stop Loss",                "value": f"${r['sl']:.4f} (-{r['sl_pct']:.1f}%)", "inline": True},
-            {"name": "🎯 Take Profits",             "value": tp_text,      "inline": False},
-            {"name": "💵 Gewinn/Verlust (5x Hebel)","value": profit_text,  "inline": False},
-            {"name": "⚠️ Hinweis",                 "value": "Kein Finanzrat. Immer eigenes Risikomanagement verwenden!", "inline": False},
+            {"name": "📊 Multi-Timeframe",           "value": tf_text,      "inline": False},
+            {"name": "🔍 M15 Indikator Details",     "value": detail_text,  "inline": False},
+            {"name": "💰 Einstieg",                  "value": f"${r['price']:.4f}", "inline": True},
+            {"name": "🛑 Stop Loss",                 "value": f"${r['sl']:.4f} (-{r['sl_pct']:.1f}%)", "inline": True},
+            {"name": "🎯 Take Profits",              "value": tp_text,      "inline": False},
+            {"name": "💵 Gewinn/Verlust (5x Hebel)", "value": profit_text,  "inline": False},
+            {"name": "⚠️ Hinweis",                  "value": "Kein Finanzrat. Immer eigenes Risikomanagement verwenden!", "inline": False},
         ],
-        "footer": {"text": "Crypto Bot • M15 Haupttimeframe • H1 Bestätigung • H4 Trend"},
+        "footer": {"text": "Crypto Bot • Binance Echtzeit API • M15+H1+H4"},
         "timestamp": datetime.utcnow().isoformat() + "Z",
     }]}
     try:
@@ -477,19 +446,19 @@ def send_discord(r):
 # ─── Hauptloop ────────────────────────────────────────────────────────────────
 def main():
     print("=" * 55)
-    print("  Crypto Signal Bot — Maximale Sicherheit")
-    print(f"  {len(TOP_50_CRYPTOS)} Coins | Min Score: {MIN_SCORE} | Max {MAX_SIGNALS} Signale")
-    print("  Filter: RSI + EMA Trend + MACD + Volumen")
+    print("  Crypto Signal Bot — Binance Echtzeit API")
+    print(f"  {len(TOP_CRYPTOS)} Coins | Min Score: {MIN_SCORE} | Max {MAX_SIGNALS} Signale")
+    print("  Keine Verzögerung — Echtzeit Daten!")
     print("=" * 55)
 
     last_signals = {}
 
     while True:
         now = datetime.utcnow().strftime("%H:%M:%S UTC")
-        print(f"\n[{now}] Scanne {len(TOP_50_CRYPTOS)} Coins...")
+        print(f"\n[{now}] Scanne {len(TOP_CRYPTOS)} Coins...")
         strong = []
 
-        for symbol, name in TOP_50_CRYPTOS:
+        for symbol, name in TOP_CRYPTOS:
             try:
                 print(f"   {name}...", end=" ", flush=True)
                 result = analyze_coin(symbol, name)
@@ -502,18 +471,16 @@ def main():
                     else:
                         print("bereits gesendet")
                 else:
-                    if result:
-                        print(f"Score {result['score']} zu niedrig")
-                    else:
-                        print("gefiltert")
-                time.sleep(2)
+                    score = result["score"] if result else 0
+                    print(f"Score {score} — gefiltert")
+                time.sleep(0.5)  # Binance Rate Limit
             except Exception as e:
                 print(f"Fehler: {e}")
 
         if strong:
             strong.sort(key=lambda x: x["score"], reverse=True)
             top = strong[:MAX_SIGNALS]
-            print(f"\n🚨 {len(top)} Signal(e) gefunden!")
+            print(f"\n🚨 {len(top)} Signal(e) — sende Discord Alerts...")
             for r in top:
                 send_discord(r)
         else:
