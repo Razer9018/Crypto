@@ -210,13 +210,13 @@ def safety_checks(name, final_dir, tf_results):
         if final_dir == "SELL" and m15_rsi < 35:
             return False, f"M15 RSI {m15_rsi:.1f} < 35 (überverkauft auf M15)"
 
-    # 2. RSI H1 — weniger streng
+    # 2. RSI H1 — gleich streng wie M15
     h1_rsi = tf_results.get("H1", {}).get("rsi")
     if h1_rsi:
-        if final_dir == "BUY" and h1_rsi > 75:
-            return False, f"H1 RSI {h1_rsi:.1f} > 75 (überkauft auf H1)"
-        if final_dir == "SELL" and h1_rsi < 25:
-            return False, f"H1 RSI {h1_rsi:.1f} < 25 (überverkauft auf H1)"
+        if final_dir == "BUY" and h1_rsi > 65:
+            return False, f"H1 RSI {h1_rsi:.1f} > 65 (überkauft auf H1)"
+        if final_dir == "SELL" and h1_rsi < 35:
+            return False, f"H1 RSI {h1_rsi:.1f} < 35 (überverkauft auf H1)"
 
     # 3. RSI H4 — nur extremste Werte blockieren
     r_h4 = tf_results.get("H4", {}).get("rsi")
@@ -226,12 +226,12 @@ def safety_checks(name, final_dir, tf_results):
         if final_dir == "SELL" and r_h4 < 20:
             return False, f"H4 RSI {r_h4:.1f} < 20 (extrem überverkauft)"
 
-    # 3. H4 EMA Trend — nur gegen extremen Trend blockieren
+    # 3. H4 EMA Trend — muss klar in Signal-Richtung zeigen
     h4_trend = tf_results.get("H4", {}).get("ema_trend", "neutral")
-    if final_dir == "BUY" and h4_trend == "bear":
-        return False, "H4 EMA starker Abwärtstrend — kein BUY"
-    if final_dir == "SELL" and h4_trend == "bull":
-        return False, "H4 EMA starker Aufwärtstrend — kein SELL"
+    if final_dir == "BUY" and h4_trend != "bull":
+        return False, f"H4 EMA kein klarer Aufwärtstrend ({h4_trend}) — kein BUY"
+    if final_dir == "SELL" and h4_trend != "bear":
+        return False, f"H4 EMA kein klarer Abwärtstrend ({h4_trend}) — kein SELL"
 
     # 4. MACD muss auf M15, H1 UND H4 stimmen
     m15_macd = tf_results.get("M15", {}).get("macd")
@@ -347,7 +347,7 @@ def analyze_tf(candles):
 
 # ─── Coin analysieren ─────────────────────────────────────────────────────────
 def analyze_coin(symbol, name):
-    timeframes = [("15m", "M15", "7d"), ("1h", "H1", "7d"), ("4h", "H4", "30d")]
+    timeframes = [("15m", "M15", "7d"), ("1h", "H1", "30d"), ("4h", "H4", "90d")]
     tf_results = {}
 
     for interval, label, period in timeframes:
