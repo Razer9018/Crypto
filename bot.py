@@ -89,6 +89,7 @@ def get_candles_binance(symbol, interval, limit=200):
             })
         return candles
     except Exception as e:
+        print(f"      [Binance Fehler {symbol} {interval}]: {type(e).__name__}: {e}")
         return None
 
 # ─── Indikatoren ──────────────────────────────────────────────────────────────
