@@ -8,7 +8,7 @@ from datetime import datetime
 # ─── Config ───────────────────────────────────────────────────────────────────
 DISCORD_WEBHOOK = os.environ.get("DISCORD_WEBHOOK_CRYPTO", "")
 SCAN_EVERY      = 900   # alle 15 Minuten
-MIN_SCORE       = 7     # mindestens 7/10
+MIN_SCORE       = 6     # mindestens 6/10
 MAX_SIGNALS     = 2     # max 2 Signale pro Scan
 HEBEL           = 5
 
@@ -198,38 +198,36 @@ def ema_trend(closes):
 
 # ─── Sicherheits-Filter ───────────────────────────────────────────────────────
 def safety_checks(name, final_dir, tf_results):
-    # 1. RSI M15 und H1 — beide müssen unter 65 (BUY) bzw über 35 (SELL)
-    for tf in ["M15", "H1"]:
-        r = tf_results.get(tf, {}).get("rsi")
-        if r:
-            if final_dir == "BUY" and r > 65:
-                return False, f"{tf} RSI {r:.1f} > 65 — überkauft"
-            if final_dir == "SELL" and r < 35:
-                return False, f"{tf} RSI {r:.1f} < 35 — überverkauft"
+    # 1. RSI M15 — nur extreme Werte blockieren
+    m15_rsi = tf_results.get("M15", {}).get("rsi")
+    if m15_rsi:
+        if final_dir == "BUY" and m15_rsi > 75:
+            return False, f"M15 RSI {m15_rsi:.1f} > 75 — überkauft"
+        if final_dir == "SELL" and m15_rsi < 25:
+            return False, f"M15 RSI {m15_rsi:.1f} < 25 — überverkauft"
 
-    # 2. RSI H4 — nur extreme Werte blockieren
-    r_h4 = tf_results.get("H4", {}).get("rsi")
-    if r_h4:
-        if final_dir == "BUY" and r_h4 > 80:
-            return False, f"H4 RSI {r_h4:.1f} > 80 — extrem überkauft"
-        if final_dir == "SELL" and r_h4 < 20:
-            return False, f"H4 RSI {r_h4:.1f} < 20 — extrem überverkauft"
+    # 2. RSI H1 — moderate Grenze
+    h1_rsi = tf_results.get("H1", {}).get("rsi")
+    if h1_rsi:
+        if final_dir == "BUY" and h1_rsi > 78:
+            return False, f"H1 RSI {h1_rsi:.1f} > 78 — überkauft"
+        if final_dir == "SELL" and h1_rsi < 22:
+            return False, f"H1 RSI {h1_rsi:.1f} < 22 — überverkauft"
 
-    # 3. H4 EMA muss klar in Signal-Richtung zeigen — KEIN neutraler Trend
+    # 3. H4 EMA — neutral ist OK, nur gegen klaren Trend blockieren
     h4_trend = tf_results.get("H4", {}).get("ema_trend", "neutral")
-    if final_dir == "BUY" and h4_trend != "bull":
-        return False, f"H4 EMA kein Aufwärtstrend ({h4_trend})"
-    if final_dir == "SELL" and h4_trend != "bear":
-        return False, f"H4 EMA kein Abwärtstrend ({h4_trend})"
+    if final_dir == "BUY" and h4_trend == "bear":
+        return False, "H4 EMA klarer Abwärtstrend — kein BUY"
+    if final_dir == "SELL" and h4_trend == "bull":
+        return False, "H4 EMA klarer Aufwärtstrend — kein SELL"
 
-    # 4. MACD muss auf M15, H1 UND H4 stimmen
-    for tf in ["M15", "H1", "H4"]:
-        m = tf_results.get(tf, {}).get("macd")
-        if m is not None:
-            if final_dir == "BUY" and m < 0:
-                return False, f"{tf} MACD bearish — kein BUY"
-            if final_dir == "SELL" and m > 0:
-                return False, f"{tf} MACD bullish — kein SELL"
+    # 4. Nur H4 MACD muss stimmen (wichtigster Timeframe)
+    h4_macd = tf_results.get("H4", {}).get("macd")
+    if h4_macd is not None:
+        if final_dir == "BUY" and h4_macd < 0:
+            return False, "H4 MACD bearish — kein BUY"
+        if final_dir == "SELL" and h4_macd > 0:
+            return False, "H4 MACD bullish — kein SELL"
 
     return True, "✅ Alle Filter bestanden"
 
