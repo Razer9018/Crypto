@@ -7,103 +7,91 @@ from datetime import datetime
 
 # ─── Config ───────────────────────────────────────────────────────────────────
 DISCORD_WEBHOOK = os.environ.get("DISCORD_WEBHOOK_CRYPTO", "")
-SCAN_EVERY      = 900
-MIN_SCORE       = 5
-MAX_SIGNALS     = 3
+SCAN_EVERY      = 900   # alle 15 Minuten
+MIN_SCORE       = 6     # mindestens 6/10
+MAX_SIGNALS     = 2     # max 2 Signale pro Scan
 HEBEL           = 5
 
-# CoinGecko IDs
+# Bybit USDT Perpetual Symbole
 TOP_CRYPTOS = [
-    ("bitcoin",          "BTCUSDT",  "Bitcoin"),
-    ("ethereum",         "ETHUSDT",  "Ethereum"),
-    ("binancecoin",      "BNBUSDT",  "BNB"),
-    ("solana",           "SOLUSDT",  "Solana"),
-    ("ripple",           "XRPUSDT",  "XRP"),
-    ("cardano",          "ADAUSDT",  "Cardano"),
-    ("avalanche-2",      "AVAXUSDT", "Avalanche"),
-    ("dogecoin",         "DOGEUSDT", "Dogecoin"),
-    ("polkadot",         "DOTUSDT",  "Polkadot"),
-    ("matic-network",    "MATICUSDT","Polygon"),
-    ("litecoin",         "LTCUSDT",  "Litecoin"),
-    ("chainlink",        "LINKUSDT", "Chainlink"),
-    ("cosmos",           "ATOMUSDT", "Cosmos"),
-    ("stellar",          "XLMUSDT",  "Stellar"),
-    ("bitcoin-cash",     "BCHUSDT",  "Bitcoin Cash"),
-    ("algorand",         "ALGOUSDT", "Algorand"),
-    ("filecoin",         "FILUSDT",  "Filecoin"),
-    ("near",             "NEARUSDT", "NEAR Protocol"),
-    ("aave",             "AAVEUSDT", "Aave"),
-    ("maker",            "MKRUSDT",  "Maker"),
-    ("injective-protocol","INJUSDT", "Injective"),
-    ("the-sandbox",      "SANDUSDT", "The Sandbox"),
-    ("axie-infinity",    "AXSUSDT",  "Axie Infinity"),
-    ("theta-token",      "THETAUSDT","Theta"),
-    ("tezos",            "XTZUSDT",  "Tezos"),
-    ("eos",              "EOSUSDT",  "EOS"),
-    ("chiliz",           "CHZUSDT",  "Chiliz"),
-    ("optimism",         "OPUSDT",   "Optimism"),
-    ("the-graph",        "GRTUSDT",  "The Graph"),
-    ("compound-governance-token", "COMPUSDT", "Compound"),
-    ("zcash",            "ZECUSDT",  "Zcash"),
-    ("basic-attention-token", "BATUSDT", "Basic Attention"),
-    ("zilliqa",          "ZILUSDT",  "Zilliqa"),
-    ("1inch",            "1INCHUSDT","1inch"),
-    ("vechain",          "VETUSDT",  "VeChain"),
-    ("synthetix-network-token", "SNXUSDT", "Synthetix"),
-    ("curve-dao-token",  "CRVUSDT",  "Curve"),
-    ("lido-dao",         "LDOUSDT",  "Lido"),
+    ("BTCUSDT",   "Bitcoin"),
+    ("ETHUSDT",   "Ethereum"),
+    ("BNBUSDT",   "BNB"),
+    ("SOLUSDT",   "Solana"),
+    ("XRPUSDT",   "XRP"),
+    ("ADAUSDT",   "Cardano"),
+    ("AVAXUSDT",  "Avalanche"),
+    ("DOGEUSDT",  "Dogecoin"),
+    ("DOTUSDT",   "Polkadot"),
+    ("MATICUSDT", "Polygon"),
+    ("LTCUSDT",   "Litecoin"),
+    ("LINKUSDT",  "Chainlink"),
+    ("ATOMUSDT",  "Cosmos"),
+    ("XLMUSDT",   "Stellar"),
+    ("BCHUSDT",   "Bitcoin Cash"),
+    ("ALGOUSDT",  "Algorand"),
+    ("FILUSDT",   "Filecoin"),
+    ("NEARUSDT",  "NEAR Protocol"),
+    ("AAVEUSDT",  "Aave"),
+    ("MKRUSDT",   "Maker"),
+    ("INJUSDT",   "Injective"),
+    ("SANDUSDT",  "The Sandbox"),
+    ("AXSUSDT",   "Axie Infinity"),
+    ("THETAUSDT", "Theta"),
+    ("XTZUSDT",   "Tezos"),
+    ("EOSUSDT",   "EOS"),
+    ("CHZUSDT",   "Chiliz"),
+    ("OPUSDT",    "Optimism"),
+    ("GRTUSDT",   "The Graph"),
+    ("COMPUSDT",  "Compound"),
+    ("BATUSDT",   "Basic Attention"),
+    ("ZILUSDT",   "Zilliqa"),
+    ("1INCHUSDT", "1inch"),
+    ("VETUSDT",   "VeChain"),
+    ("SNXUSDT",   "Synthetix"),
+    ("CRVUSDT",   "Curve"),
+    ("LDOUSDT",   "Lido"),
+    ("ICXUSDT",   "ICON"),
+    ("ENJUSDT",   "Enjin Coin"),
+    ("ZECUSDT",   "Zcash"),
 ]
 
-# ─── CoinGecko OHLC Daten holen ──────────────────────────────────────────────
-def get_ohlc_coingecko(coin_id, days=14):
+TIMEFRAMES = [
+    ("15",  "M15",  200),  # 15 Minuten — Haupttimeframe
+    ("60",  "H1",   200),  # 1 Stunde — Bestätigung
+    ("240", "H4",   200),  # 4 Stunden — Trend
+]
+
+# ─── Bybit API ────────────────────────────────────────────────────────────────
+def get_candles_bybit(symbol, interval, limit=200):
     """
-    CoinGecko /coins/{id}/ohlc endpoint
-    days=1 → 30min Kerzen, days=7/14 → 4h Kerzen
-    Kostenlos, kein API Key nötig
+    Bybit V5 API — kostenlos, kein API Key nötig, funktioniert auf Cloud-Servern
+    interval: "15" = 15min, "60" = 1h, "240" = 4h
     """
     try:
-        url = f"https://api.coingecko.com/api/v3/coins/{coin_id}/ohlc?vs_currency=usd&days={days}"
-        req = urllib.request.Request(url, headers={
-            "User-Agent": "Mozilla/5.0",
-            "Accept": "application/json"
-        })
+        url = f"https://api.bybit.com/v5/market/kline?symbol={symbol}&interval={interval}&limit={limit}&category=linear"
+        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
         with urllib.request.urlopen(req, timeout=15) as r:
             data = json.loads(r.read())
+
+        if data.get("retCode") != 0:
+            print(f"      [Bybit Error {symbol}]: {data.get('retMsg')}")
+            return None
+
+        result = data["result"]["list"]
         candles = []
-        for item in data:
+        for k in reversed(result):  # Bybit gibt neueste zuerst
             candles.append({
-                "time":   item[0],
-                "open":   float(item[1]),
-                "high":   float(item[2]),
-                "low":    float(item[3]),
-                "close":  float(item[4]),
-                "volume": 0,
+                "time":   int(k[0]),
+                "open":   float(k[1]),
+                "high":   float(k[2]),
+                "low":    float(k[3]),
+                "close":  float(k[4]),
+                "volume": float(k[5]),
             })
         return candles
     except Exception as e:
-        print(f"      [CoinGecko Fehler {coin_id}]: {type(e).__name__}: {e}")
-        return None
-
-def get_market_data(coin_id):
-    """Holt aktuellen Preis + Volumen von CoinGecko"""
-    try:
-        url = f"https://api.coingecko.com/api/v3/coins/{coin_id}?localization=false&tickers=false&community_data=false&developer_data=false"
-        req = urllib.request.Request(url, headers={
-            "User-Agent": "Mozilla/5.0",
-            "Accept": "application/json"
-        })
-        with urllib.request.urlopen(req, timeout=15) as r:
-            data = json.loads(r.read())
-        market = data.get("market_data", {})
-        return {
-            "price":       market.get("current_price", {}).get("usd", 0),
-            "volume_24h":  market.get("total_volume",  {}).get("usd", 0),
-            "change_24h":  market.get("price_change_percentage_24h", 0),
-            "change_7d":   market.get("price_change_percentage_7d",  0),
-            "change_1h":   market.get("price_change_percentage_1h_in_currency", {}).get("usd", 0),
-        }
-    except Exception as e:
-        print(f"      [CoinGecko Market Fehler {coin_id}]: {e}")
+        print(f"      [Bybit Fehler {symbol} {interval}]: {type(e).__name__}: {e}")
         return None
 
 # ─── Indikatoren ──────────────────────────────────────────────────────────────
@@ -178,18 +166,50 @@ def ema_trend(closes):
         if e20 < e50 and price < e20: return "bear"
     return "neutral"
 
-# ─── Analyse ──────────────────────────────────────────────────────────────────
-def analyze_candles(candles):
-    if not candles or len(candles) < 30:
+def volume_rising(candles, period=10):
+    if len(candles) < period + 1:
+        return False, 0
+    avg = sum(c["volume"] for c in candles[-period-1:-1]) / period
+    cur = candles[-1]["volume"]
+    if avg == 0:
+        return False, 0
+    ratio = cur / avg
+    return ratio >= 1.3, ratio
+
+def rsi_divergence(candles, period=8):
+    if len(candles) < period * 2:
+        return None
+    closes   = [c["close"] for c in candles]
+    rsi_vals = [rsi(closes[:i+1]) for i in range(len(closes))]
+    rsi_vals = [r for r in rsi_vals if r is not None]
+    if len(rsi_vals) < period * 2:
+        return None
+    curr_low   = min(closes[-period:])
+    prev_low   = min(closes[-period*2:-period])
+    curr_rsi_l = min(rsi_vals[-period:])
+    prev_rsi_l = min(rsi_vals[-period*2:-period])
+    if curr_low < prev_low and curr_rsi_l > prev_rsi_l:
+        return "bullish"
+    curr_high  = max(closes[-period:])
+    prev_high  = max(closes[-period*2:-period])
+    curr_rsi_h = max(rsi_vals[-period:])
+    prev_rsi_h = max(rsi_vals[-period*2:-period])
+    if curr_high > prev_high and curr_rsi_h < prev_rsi_h:
+        return "bearish"
+    return None
+
+# ─── Einzelnen Timeframe analysieren ─────────────────────────────────────────
+def analyze_tf(candles):
+    if not candles or len(candles) < 50:
         return None
     closes  = [c["close"] for c in candles]
     price   = closes[-1]
+    trend   = ema_trend(closes)
     rsi_v   = rsi(closes)
     macd_l, sig, hist = macd_calc(closes)
     bb_u, bb_m, bb_l  = bollinger(closes)
-    trend   = ema_trend(closes)
-    e20     = ema(closes, 20)
-    e50     = ema(closes, 50)
+    vol_ok, vol_ratio = volume_rising(candles)
+    div     = rsi_divergence(candles)
 
     bull = bear = 0
     details = {}
@@ -197,21 +217,21 @@ def analyze_candles(candles):
     # EMA Trend (2 Punkte)
     if trend == "bull":
         bull += 2
-        details["EMA"] = "✅ Aufwärtstrend"
+        details["EMA"] = "✅ Aufwärtstrend (EMA20>50>200)"
     elif trend == "bear":
         bear += 2
-        details["EMA"] = "✅ Abwärtstrend"
+        details["EMA"] = "✅ Abwärtstrend (EMA20<50<200)"
     else:
-        details["EMA"] = "⚠️ Kein klarer Trend"
+        details["EMA"] = "⚠️ Kein klarer EMA Trend"
 
     # MACD (2 Punkte)
     if macd_l is not None and sig is not None:
         if macd_l > sig and hist and hist > 0:
             bull += 2
-            details["MACD"] = f"✅ MACD bullish"
+            details["MACD"] = f"✅ MACD bullish ({macd_l:.5f})"
         elif macd_l < sig and hist and hist < 0:
             bear += 2
-            details["MACD"] = f"✅ MACD bearish"
+            details["MACD"] = f"✅ MACD bearish ({macd_l:.5f})"
         else:
             details["MACD"] = "⚠️ MACD neutral"
 
@@ -225,6 +245,24 @@ def analyze_candles(candles):
             details["RSI"] = f"✅ RSI überkauft ({rsi_v:.1f})"
         else:
             details["RSI"] = f"⚠️ RSI neutral ({rsi_v:.1f})"
+
+    # RSI Divergenz (2 Punkte)
+    if div == "bullish":
+        bull += 2
+        details["Divergenz"] = "✅ Bullische RSI Divergenz!"
+    elif div == "bearish":
+        bear += 2
+        details["Divergenz"] = "✅ Bärische RSI Divergenz!"
+    else:
+        details["Divergenz"] = "❌ Keine Divergenz"
+
+    # Volumen (1 Punkt)
+    if vol_ok:
+        if bull >= bear: bull += 1
+        else:            bear += 1
+        details["Volumen"] = f"✅ Erhöhtes Volumen ({vol_ratio:.1f}x)"
+    else:
+        details["Volumen"] = f"❌ Normales Volumen ({vol_ratio:.1f}x)"
 
     # Bollinger (1 Punkt)
     if bb_l and price <= bb_l * 1.002:
@@ -240,36 +278,84 @@ def analyze_candles(candles):
     return {
         "direction": direction, "bull": bull, "bear": bear,
         "rsi": rsi_v, "macd": macd_l, "details": details,
-        "price": price, "ema_trend": trend,
+        "price": price, "vol_ok": vol_ok, "ema_trend": trend,
+        "candles": candles,
     }
 
+# ─── SL/TP aus echtem Chart ──────────────────────────────────────────────────
+def calc_sl_tp(candles, direction):
+    price  = candles[-1]["close"]
+    recent = candles[-20:]
+    puffer = price * 0.004  # 0.4% Puffer
+
+    if direction == "BUY":
+        sl      = min(c["low"] for c in recent) - puffer
+        sl_dist = max(price - sl, price * 0.01)
+    else:
+        sl      = max(c["high"] for c in recent) + puffer
+        sl_dist = max(sl - price, price * 0.01)
+
+    sl_pct = (sl_dist / price) * 100
+    crv    = 5 if sl_pct <= 2 else 4 if sl_pct <= 4 else 3
+
+    tp3 = price + sl_dist * 3 if direction == "BUY" else price - sl_dist * 3
+    tp4 = price + sl_dist * 4 if direction == "BUY" else price - sl_dist * 4
+    tp5 = price + sl_dist * 5 if direction == "BUY" else price - sl_dist * 5
+
+    return sl, tp3, tp4, tp5, crv, sl_pct
+
+# ─── Sicherheits-Filter ───────────────────────────────────────────────────────
+def safety_checks(name, final_dir, tf_results):
+    # 1. RSI M15 — nicht überkauft/überverkauft
+    m15_rsi = tf_results.get("M15", {}).get("rsi")
+    if m15_rsi:
+        if final_dir == "BUY" and m15_rsi > 72:
+            return False, f"M15 RSI {m15_rsi:.1f} > 72 überkauft"
+        if final_dir == "SELL" and m15_rsi < 28:
+            return False, f"M15 RSI {m15_rsi:.1f} < 28 überverkauft"
+
+    # 2. H1 RSI
+    h1_rsi = tf_results.get("H1", {}).get("rsi")
+    if h1_rsi:
+        if final_dir == "BUY" and h1_rsi > 75:
+            return False, f"H1 RSI {h1_rsi:.1f} > 75 überkauft"
+        if final_dir == "SELL" and h1_rsi < 25:
+            return False, f"H1 RSI {h1_rsi:.1f} < 25 überverkauft"
+
+    # 3. H4 EMA Trend — neutral ist OK, nur klarer Gegentrend blockiert
+    h4_trend = tf_results.get("H4", {}).get("ema_trend", "neutral")
+    if final_dir == "BUY" and h4_trend == "bear":
+        return False, "H4 EMA klarer Abwärtstrend — kein BUY"
+    if final_dir == "SELL" and h4_trend == "bull":
+        return False, "H4 EMA klarer Aufwärtstrend — kein SELL"
+
+    # 4. H4 MACD muss stimmen
+    h4_macd = tf_results.get("H4", {}).get("macd")
+    if h4_macd is not None:
+        if final_dir == "BUY" and h4_macd < 0:
+            return False, "H4 MACD bearish — kein BUY"
+        if final_dir == "SELL" and h4_macd > 0:
+            return False, "H4 MACD bullish — kein SELL"
+
+    return True, "✅ Alle Filter bestanden"
+
 # ─── Coin analysieren ─────────────────────────────────────────────────────────
-def analyze_coin(coin_id, symbol, name):
-    # Kurzfristig (1 Tag = 30min Kerzen)
-    candles_short = get_ohlc_coingecko(coin_id, days=1)
-    time.sleep(1.5)  # CoinGecko Rate Limit
-    # Mittelfristig (7 Tage = 4h Kerzen)
-    candles_mid = get_ohlc_coingecko(coin_id, days=7)
-    time.sleep(1.5)
-    # Langfristig (30 Tage = 4h Kerzen)
-    candles_long = get_ohlc_coingecko(coin_id, days=30)
-    time.sleep(1.5)
-    # Marktdaten
-    market = get_market_data(coin_id)
-    time.sleep(1.5)
+def analyze_coin(symbol, name):
+    tf_results = {}
 
-    if not candles_short or not candles_mid or not candles_long:
+    for interval, label, limit in TIMEFRAMES:
+        candles = get_candles_bybit(symbol, interval, limit)
+        if candles and len(candles) >= 50:
+            r = analyze_tf(candles)
+            if r:
+                tf_results[label] = r
+        time.sleep(0.3)
+
+    if len(tf_results) < 3:
         return None
 
-    r_short = analyze_candles(candles_short)
-    r_mid   = analyze_candles(candles_mid)
-    r_long  = analyze_candles(candles_long)
-
-    if not r_short or not r_mid or not r_long:
-        return None
-
-    # Alle 3 müssen übereinstimmen
-    dirs = [r_short["direction"], r_mid["direction"], r_long["direction"]]
+    # Alle 3 Timeframes müssen übereinstimmen
+    dirs = [tf_results[tf]["direction"] for tf in ["M15", "H1", "H4"]]
     if dirs.count("BUY") == 3:
         final_dir = "BUY"
     elif dirs.count("SELL") == 3:
@@ -277,49 +363,22 @@ def analyze_coin(coin_id, symbol, name):
     else:
         return None
 
-    # RSI Filter
-    rsi_short = r_short["rsi"]
-    rsi_mid   = r_mid["rsi"]
-    if rsi_short:
-        if final_dir == "BUY" and rsi_short > 75:
-            print(f"   RSI kurzfristig {rsi_short:.1f} > 75 — blockiert")
-            return None
-        if final_dir == "SELL" and rsi_short < 25:
-            print(f"   RSI kurzfristig {rsi_short:.1f} < 25 — blockiert")
-            return None
-
-    # H4 MACD Filter
-    macd_long = r_long["macd"]
-    if macd_long is not None:
-        if final_dir == "BUY" and macd_long < 0:
-            print(f"   Langfrist MACD bearish — BUY blockiert")
-            return None
-        if final_dir == "SELL" and macd_long > 0:
-            print(f"   Langfrist MACD bullish — SELL blockiert")
-            return None
-
-    # EMA Trend Filter
-    long_trend = r_long["ema_trend"]
-    if final_dir == "BUY" and long_trend == "bear":
-        print(f"   Langfrist EMA Abwärtstrend — BUY blockiert")
-        return None
-    if final_dir == "SELL" and long_trend == "bull":
-        print(f"   Langfrist EMA Aufwärtstrend — SELL blockiert")
+    # Sicherheits-Filter
+    passed, reason = safety_checks(name, final_dir, tf_results)
+    if not passed:
+        print(f"   ❌ {reason}")
         return None
 
-    # Score
-    total = (r_short["bull" if final_dir == "BUY" else "bear"] * 2 +
-             r_mid["bull"   if final_dir == "BUY" else "bear"] +
-             r_long["bull"  if final_dir == "BUY" else "bear"])
+    # Score — M15 zählt doppelt
+    key = "bull" if final_dir == "BUY" else "bear"
+    total = (tf_results["M15"][key] * 2 +
+             tf_results["H1"][key] +
+             tf_results["H4"][key])
 
-    # Preis + SL/TP
-    price = market["price"] if market else r_short["price"]
-    sl_pct = 3.0 if final_dir == "BUY" else 3.0
-    crv    = 4
-    sl     = price * (1 - sl_pct/100) if final_dir == "BUY" else price * (1 + sl_pct/100)
-    tp3    = price * (1 + sl_pct/100 * 3) if final_dir == "BUY" else price * (1 - sl_pct/100 * 3)
-    tp4    = price * (1 + sl_pct/100 * 4) if final_dir == "BUY" else price * (1 - sl_pct/100 * 4)
-    tp5    = price * (1 + sl_pct/100 * 5) if final_dir == "BUY" else price * (1 - sl_pct/100 * 5)
+    # SL/TP aus echtem H1 Chart
+    h1_candles = tf_results["H1"]["candles"]
+    sl, tp3, tp4, tp5, crv, sl_pct = calc_sl_tp(h1_candles, final_dir)
+    price = h1_candles[-1]["close"]
 
     profits = {}
     for kapital in [50, 100, 200, 500]:
@@ -327,12 +386,11 @@ def analyze_coin(coin_id, symbol, name):
         profits[kapital] = {"risiko": risiko, "gewinn": risiko * crv}
 
     return {
-        "coin_id": coin_id, "symbol": symbol, "name": name,
-        "direction": final_dir, "score": total, "price": price,
+        "symbol": symbol, "name": name, "direction": final_dir,
+        "score": total, "price": price,
         "sl": sl, "tp3": tp3, "tp4": tp4, "tp5": tp5,
         "crv": crv, "sl_pct": sl_pct, "profits": profits,
-        "r_short": r_short, "r_mid": r_mid, "r_long": r_long,
-        "market": market,
+        "tf_results": tf_results,
     }
 
 # ─── Discord ──────────────────────────────────────────────────────────────────
@@ -342,25 +400,18 @@ def send_discord(r):
     emoji = "🟢" if r["direction"] == "BUY" else "🔴"
     color = 0x00c853 if r["direction"] == "BUY" else 0xd50000
 
-    def tf_line(label, data):
-        arrow = "📈" if data["direction"] == "BUY" else "📉"
-        rsi_v = f"{data['rsi']:.1f}" if data["rsi"] else "N/A"
-        macd_a = "▲" if data["macd"] and data["macd"] > 0 else "▼"
-        return f"{arrow} **{label}**: RSI {rsi_v} | MACD {macd_a} | EMA {data['ema_trend']}\n"
+    tf_text = ""
+    for tf in ["M15", "H1", "H4"]:
+        if tf in r["tf_results"]:
+            d = r["tf_results"][tf]
+            arrow = "📈" if d["direction"] == "BUY" else "📉"
+            rsi_v = f"{d['rsi']:.1f}" if d["rsi"] else "N/A"
+            macd_a = "▲" if d["macd"] and d["macd"] > 0 else "▼"
+            label = "🎯(Haupt)" if tf == "M15" else "(Bestätigung)" if tf == "H1" else "(Trend)"
+            tf_text += f"{arrow} **{tf} {label}**: RSI {rsi_v} | MACD {macd_a} | EMA {d['ema_trend']} | Vol {'✅' if d['vol_ok'] else '❌'}\n"
 
-    tf_text = (tf_line("Kurzfristig (30m)", r["r_short"]) +
-               tf_line("Mittelfristig (4h)", r["r_mid"]) +
-               tf_line("Langfristig (30T)", r["r_long"]))
-
-    details = r["r_short"]["details"]
-    detail_text = "\n".join(list(details.values())[:4])
-
-    market = r["market"] or {}
-    market_text = (
-        f"1h: {market.get('change_1h', 0):+.2f}% | "
-        f"24h: {market.get('change_24h', 0):+.2f}% | "
-        f"7d: {market.get('change_7d', 0):+.2f}%"
-    )
+    m15_details = r["tf_results"].get("M15", {}).get("details", {})
+    detail_text = "\n".join(list(m15_details.values())[:5])
 
     tp_text = f"3:1 → ${r['tp3']:.4f}\n4:1 → ${r['tp4']:.4f}\n5:1 → ${r['tp5']:.4f}"
     p = r["profits"]
@@ -375,20 +426,22 @@ def send_discord(r):
     embed = {"embeds": [{"title": f"{emoji} {r['name']} — {r['direction']} Signal",
         "color": color,
         "description": (
-            f"**Starkes {r['direction']} Signal auf allen Timeframes!**\n"
-            f"Score: **{r['score']} Punkte** | CRV: **{r['crv']}:1**"
+            f"**Starkes {r['direction']} Signal auf allen 3 Timeframes!**\n"
+            f"Score: **{r['score']} Punkte** | CRV: **{r['crv']}:1**\n\n"
+            f"✅ Bybit Echtzeit Daten\n"
+            f"✅ Echter SL aus Chart (letztes Swing High/Low)\n"
+            f"✅ Alle Sicherheitsfilter bestanden"
         ),
         "fields": [
-            {"name": "📊 Multi-Timeframe",            "value": tf_text,      "inline": False},
-            {"name": "📈 Markt Performance",          "value": market_text,  "inline": False},
-            {"name": "🔍 Indikator Details",          "value": detail_text,  "inline": False},
-            {"name": "💰 Einstieg",                   "value": f"${r['price']:.4f}", "inline": True},
-            {"name": "🛑 Stop Loss",                  "value": f"${r['sl']:.4f} (-{r['sl_pct']:.1f}%)", "inline": True},
-            {"name": "🎯 Take Profits",               "value": tp_text,      "inline": False},
-            {"name": "💵 Gewinn/Verlust (5x Hebel)",  "value": profit_text,  "inline": False},
-            {"name": "⚠️ Hinweis",                   "value": "Kein Finanzrat. Immer eigenes Risikomanagement verwenden!", "inline": False},
+            {"name": "📊 Multi-Timeframe (M15+H1+H4)", "value": tf_text,     "inline": False},
+            {"name": "🔍 M15 Indikator Details",        "value": detail_text, "inline": False},
+            {"name": "💰 Einstieg",  "value": f"${r['price']:.4f}",           "inline": True},
+            {"name": "🛑 Stop Loss", "value": f"${r['sl']:.4f} (-{r['sl_pct']:.1f}%)", "inline": True},
+            {"name": "🎯 Take Profits",              "value": tp_text,        "inline": False},
+            {"name": "💵 Gewinn/Verlust (5x Hebel)", "value": profit_text,    "inline": False},
+            {"name": "⚠️ Hinweis",  "value": "Kein Finanzrat. Immer eigenes Risikomanagement verwenden!", "inline": False},
         ],
-        "footer": {"text": "Crypto Bot • CoinGecko API • 30m + 4h + 30T Analyse"},
+        "footer": {"text": "Crypto Bot • Bybit Echtzeit API • M15 + H1 + H4"},
         "timestamp": datetime.utcnow().isoformat() + "Z",
     }]}
     try:
@@ -401,9 +454,9 @@ def send_discord(r):
 # ─── Hauptloop ────────────────────────────────────────────────────────────────
 def main():
     print("=" * 55)
-    print("  Crypto Signal Bot — CoinGecko API")
-    print(f"  {len(TOP_CRYPTOS)} Coins | Min Score: {MIN_SCORE}")
-    print("  30min + 4h + 30 Tage Analyse")
+    print("  Crypto Signal Bot — Bybit Echtzeit API")
+    print(f"  {len(TOP_CRYPTOS)} Coins | M15 + H1 + H4 | Min Score: {MIN_SCORE}")
+    print("  Echter SL aus Chart | Alle Sicherheitsfilter")
     print("=" * 55)
 
     last_signals = {}
@@ -413,15 +466,15 @@ def main():
         print(f"\n[{now}] Scanne {len(TOP_CRYPTOS)} Coins...")
         strong = []
 
-        for coin_id, symbol, name in TOP_CRYPTOS:
+        for symbol, name in TOP_CRYPTOS:
             try:
                 print(f"   {name}...", end=" ", flush=True)
-                result = analyze_coin(coin_id, symbol, name)
+                result = analyze_coin(symbol, name)
                 if result and result["score"] >= MIN_SCORE:
-                    sig_key = f"{coin_id}_{result['direction']}"
-                    if sig_key != last_signals.get(coin_id):
+                    sig_key = f"{symbol}_{result['direction']}"
+                    if sig_key != last_signals.get(symbol):
                         strong.append(result)
-                        last_signals[coin_id] = sig_key
+                        last_signals[symbol] = sig_key
                         print(f"✅ {result['direction']} Score:{result['score']}")
                     else:
                         print("bereits gesendet")
@@ -434,11 +487,11 @@ def main():
         if strong:
             strong.sort(key=lambda x: x["score"], reverse=True)
             top = strong[:MAX_SIGNALS]
-            print(f"\n🚨 {len(top)} Signal(e)!")
+            print(f"\n🚨 {len(top)} Signal(e) — sende Discord Alerts...")
             for r in top:
                 send_discord(r)
         else:
-            print("\n😴 Keine Signale.")
+            print("\n😴 Keine Signale die alle Filter bestehen.")
 
         print(f"\nNächster Scan in {SCAN_EVERY // 60} Min...")
         time.sleep(SCAN_EVERY)
