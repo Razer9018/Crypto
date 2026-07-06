@@ -33,15 +33,12 @@ TOP_CRYPTOS = [
     ("BCHUSDT",   "Bitcoin Cash"),
     ("NEARUSDT",  "NEAR Protocol"),
     ("AAVEUSDT",  "Aave"),
-    ("INJUSDT",   "Injective"),
     ("OPUSDT",    "Optimism"),
     ("ARBUSDT",   "Arbitrum"),
     ("APTUSDT",   "Aptos"),
     ("SUIUSDT",   "Sui"),
     ("FETUSDT",   "Fetch.ai"),
     ("IMXUSDT",   "Immutable X"),
-    ("LDOUSDT",   "Lido"),
-    ("MKRUSDT",   "Maker"),
     # Trending — hohes Volumen aktuell
     ("TAOUSDT",   "Bittensor TAO"),
     ("HYPEUSDT",  "Hyperliquid HYPE"),
@@ -300,18 +297,18 @@ def safety_checks(name, final_dir, tf_results):
     # 1. RSI M15 — nicht überkauft/überverkauft
     m15_rsi = tf_results.get("M15", {}).get("rsi")
     if m15_rsi:
-        if final_dir == "BUY" and m15_rsi > 65:
-            return False, f"M15 RSI {m15_rsi:.1f} > 65 überkauft"
-        if final_dir == "SELL" and m15_rsi < 35:
-            return False, f"M15 RSI {m15_rsi:.1f} < 35 überverkauft"
+        if final_dir == "BUY" and m15_rsi > 62:
+            return False, f"M15 RSI {m15_rsi:.1f} > 62 überkauft"
+        if final_dir == "SELL" and m15_rsi < 38:
+            return False, f"M15 RSI {m15_rsi:.1f} < 38 überverkauft"
 
     # 2. H1 RSI
     h1_rsi = tf_results.get("H1", {}).get("rsi")
     if h1_rsi:
-        if final_dir == "BUY" and h1_rsi > 68:
-            return False, f"H1 RSI {h1_rsi:.1f} > 68 überkauft"
-        if final_dir == "SELL" and h1_rsi < 32:
-            return False, f"H1 RSI {h1_rsi:.1f} < 32 überverkauft"
+        if final_dir == "BUY" and h1_rsi > 63:
+            return False, f"H1 RSI {h1_rsi:.1f} > 63 überkauft"
+        if final_dir == "SELL" and h1_rsi < 37:
+            return False, f"H1 RSI {h1_rsi:.1f} < 37 überverkauft"
 
     # 3. H4 EMA Trend — neutral ist OK, nur klarer Gegentrend blockiert
     h4_trend = tf_results.get("H4", {}).get("ema_trend", "neutral")
