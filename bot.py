@@ -12,48 +12,39 @@ MIN_SCORE       = 6     # mindestens 6/10
 MAX_SIGNALS     = 2     # max 2 Signale pro Scan
 HEBEL           = 5
 
-# Bybit USDT Perpetual Symbole
+# Hochliquide Coins mit Futures auf BingX
 TOP_CRYPTOS = [
+    # Top Tier — höchstes Volumen
     ("BTCUSDT",   "Bitcoin"),
     ("ETHUSDT",   "Ethereum"),
     ("BNBUSDT",   "BNB"),
     ("SOLUSDT",   "Solana"),
     ("XRPUSDT",   "XRP"),
+    ("DOGEUSDT",  "Dogecoin"),
     ("ADAUSDT",   "Cardano"),
     ("AVAXUSDT",  "Avalanche"),
-    ("DOGEUSDT",  "Dogecoin"),
     ("DOTUSDT",   "Polkadot"),
     ("MATICUSDT", "Polygon"),
+    # Mid Tier — gutes Volumen
     ("LTCUSDT",   "Litecoin"),
     ("LINKUSDT",  "Chainlink"),
     ("ATOMUSDT",  "Cosmos"),
     ("XLMUSDT",   "Stellar"),
     ("BCHUSDT",   "Bitcoin Cash"),
-    ("ALGOUSDT",  "Algorand"),
-    ("FILUSDT",   "Filecoin"),
     ("NEARUSDT",  "NEAR Protocol"),
     ("AAVEUSDT",  "Aave"),
-    ("MKRUSDT",   "Maker"),
     ("INJUSDT",   "Injective"),
-    ("SANDUSDT",  "The Sandbox"),
-    ("AXSUSDT",   "Axie Infinity"),
-    ("THETAUSDT", "Theta"),
-    ("XTZUSDT",   "Tezos"),
-    ("EOSUSDT",   "EOS"),
-    ("CHZUSDT",   "Chiliz"),
     ("OPUSDT",    "Optimism"),
-    ("GRTUSDT",   "The Graph"),
-    ("COMPUSDT",  "Compound"),
-    ("BATUSDT",   "Basic Attention"),
-    ("ZILUSDT",   "Zilliqa"),
-    ("1INCHUSDT", "1inch"),
-    ("VETUSDT",   "VeChain"),
-    ("SNXUSDT",   "Synthetix"),
-    ("CRVUSDT",   "Curve"),
+    ("ARBUSDT",   "Arbitrum"),
+    ("APTUSDT",   "Aptos"),
+    ("SUIUSDT",   "Sui"),
+    ("FETUSDT",   "Fetch.ai"),
+    ("IMXUSDT",   "Immutable X"),
     ("LDOUSDT",   "Lido"),
-    ("ICXUSDT",   "ICON"),
-    ("ENJUSDT",   "Enjin Coin"),
-    ("ZECUSDT",   "Zcash"),
+    ("MKRUSDT",   "Maker"),
+    # Trending — hohes Volumen aktuell
+    ("TAOUSDT",   "Bittensor TAO"),
+    ("HYPEUSDT",  "Hyperliquid HYPE"),
 ]
 
 TIMEFRAMES = [
@@ -309,18 +300,18 @@ def safety_checks(name, final_dir, tf_results):
     # 1. RSI M15 — nicht überkauft/überverkauft
     m15_rsi = tf_results.get("M15", {}).get("rsi")
     if m15_rsi:
-        if final_dir == "BUY" and m15_rsi > 72:
-            return False, f"M15 RSI {m15_rsi:.1f} > 72 überkauft"
-        if final_dir == "SELL" and m15_rsi < 28:
-            return False, f"M15 RSI {m15_rsi:.1f} < 28 überverkauft"
+        if final_dir == "BUY" and m15_rsi > 65:
+            return False, f"M15 RSI {m15_rsi:.1f} > 65 überkauft"
+        if final_dir == "SELL" and m15_rsi < 35:
+            return False, f"M15 RSI {m15_rsi:.1f} < 35 überverkauft"
 
     # 2. H1 RSI
     h1_rsi = tf_results.get("H1", {}).get("rsi")
     if h1_rsi:
-        if final_dir == "BUY" and h1_rsi > 75:
-            return False, f"H1 RSI {h1_rsi:.1f} > 75 überkauft"
-        if final_dir == "SELL" and h1_rsi < 25:
-            return False, f"H1 RSI {h1_rsi:.1f} < 25 überverkauft"
+        if final_dir == "BUY" and h1_rsi > 68:
+            return False, f"H1 RSI {h1_rsi:.1f} > 68 überkauft"
+        if final_dir == "SELL" and h1_rsi < 32:
+            return False, f"H1 RSI {h1_rsi:.1f} < 32 überverkauft"
 
     # 3. H4 EMA Trend — neutral ist OK, nur klarer Gegentrend blockiert
     h4_trend = tf_results.get("H4", {}).get("ema_trend", "neutral")
