@@ -325,6 +325,14 @@ def safety_checks(name, final_dir, tf_results):
         if final_dir == "SELL" and h4_macd > 0:
             return False, "H4 MACD bullish — kein SELL"
 
+    # Divergenz Filter — bärische Divergenz = kein BUY, bullische = kein SELL
+    m15_details = tf_results.get("M15", {}).get("details", {})
+    div_text = m15_details.get("Divergenz", "")
+    if final_dir == "BUY" and "Bärische" in div_text:
+        return False, "Bärische RSI Divergenz auf M15 — kein BUY!"
+    if final_dir == "SELL" and "Bullische" in div_text:
+        return False, "Bullische RSI Divergenz auf M15 — kein SELL!"
+
     return True, "✅ Alle Filter bestanden"
 
 # ─── Coin analysieren ─────────────────────────────────────────────────────────
