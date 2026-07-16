@@ -129,6 +129,9 @@ def macd_calc(closes):
         signal = v * k9 + signal * (1 - k9)
     macd_line = macd_vals[-1]
     histogram = macd_line - signal
+    # Prüfen ob Histogramm wächst (Momentum steigt) oder schrumpft
+    prev_macd = macd_vals[-2] if len(macd_vals) >= 2 else macd_line
+    hist_growing = abs(histogram) > abs(prev_macd - signal)
     return macd_line, signal, histogram
 
 def bollinger(closes, period=20, mult=2):
@@ -199,6 +202,13 @@ def analyze_tf(candles):
     vol_ok, vol_ratio = volume_rising(candles)
     div     = rsi_divergence(candles)
 
+    # Momentum Check: wächst das MACD Histogramm noch?
+    hist_growing = False
+    if hist is not None and len(closes) >= 36:
+        macd_l2, sig2, hist2 = macd_calc(closes[:-1])
+        if hist2 is not None:
+            hist_growing = abs(hist) > abs(hist2)
+
     bull = bear = 0
     details = {}
 
@@ -212,14 +222,20 @@ def analyze_tf(candles):
     else:
         details["EMA"] = "⚠️ Kein klarer EMA Trend"
 
-    # MACD (2 Punkte)
+    # MACD (2 Punkte) — nur wenn Histogramm noch wächst
     if macd_l is not None and sig is not None:
-        if macd_l > sig and hist and hist > 0:
+        if macd_l > sig and hist and hist > 0 and hist_growing:
             bull += 2
-            details["MACD"] = f"✅ MACD bullish ({macd_l:.5f})"
-        elif macd_l < sig and hist and hist < 0:
+            details["MACD"] = f"✅ MACD bullish & wächst ({macd_l:.5f})"
+        elif macd_l < sig and hist and hist < 0 and hist_growing:
             bear += 2
-            details["MACD"] = f"✅ MACD bearish ({macd_l:.5f})"
+            details["MACD"] = f"✅ MACD bearish & wächst ({macd_l:.5f})"
+        elif macd_l > sig and hist and hist > 0:
+            bull += 1
+            details["MACD"] = f"⚠️ MACD bullish aber schwächer ({macd_l:.5f})"
+        elif macd_l < sig and hist and hist < 0:
+            bear += 1
+            details["MACD"] = f"⚠️ MACD bearish aber schwächer ({macd_l:.5f})"
         else:
             details["MACD"] = "⚠️ MACD neutral"
 
@@ -267,7 +283,7 @@ def analyze_tf(candles):
         "direction": direction, "bull": bull, "bear": bear,
         "rsi": rsi_v, "macd": macd_l, "details": details,
         "price": price, "vol_ok": vol_ok, "ema_trend": trend,
-        "candles": candles,
+        "hist_growing": hist_growing, "candles": candles,
     }
 
 # ─── SL/TP aus echtem Chart ──────────────────────────────────────────────────
@@ -332,6 +348,12 @@ def safety_checks(name, final_dir, tf_results):
         return False, "Bärische RSI Divergenz auf M15 — kein BUY!"
     if final_dir == "SELL" and "Bullische" in div_text:
         return False, "Bullische RSI Divergenz auf M15 — kein SELL!"
+
+    # Momentum Filter — MACD Histogramm muss auf M15 noch wachsen
+    m15_growing = tf_results.get("M15", {}).get("hist_growing", True)
+    h1_growing  = tf_results.get("H1",  {}).get("hist_growing", True)
+    if not m15_growing and not h1_growing:
+        return False, "MACD Momentum nachlässt auf M15+H1 — kein Signal!"
 
     return True, "✅ Alle Filter bestanden"
 
